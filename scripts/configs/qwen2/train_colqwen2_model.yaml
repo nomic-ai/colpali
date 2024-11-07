@@ -1,17 +1,17 @@
 config:
   (): colpali_engine.trainer.colmodel_training.ColModelTrainingConfig
-  output_dir: !path ../../../models/colqwen2-ba256-ckpt-5e-nopad
+  output_dir: !path ../../../models/colqwen2-7b
   processor:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
     class_to_instanciate: !ext colpali_engine.models.ColQwen2Processor
-    pretrained_model_name_or_path:  "./models/colqwen2_base" # "./models/paligemma-3b-mix-448"
+    pretrained_model_name_or_path:  "./models/colqwen2-7b-base" # "./models/paligemma-3b-mix-448"
     # num_image_tokens: 2048
     # max_length: 50
 
   model:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
     class_to_instanciate: !ext colpali_engine.models.ColQwen2
-    pretrained_model_name_or_path: "./models/colqwen2_base"
+    pretrained_model_name_or_path: "./models/colqwen2-7b-base"
     torch_dtype:  !ext torch.bfloat16
     use_cache: false
     attn_implementation: "flash_attention_2"
@@ -34,8 +34,8 @@ config:
     (): transformers.training_args.TrainingArguments
     output_dir: null
     overwrite_output_dir: true
-    num_train_epochs: 5
-    per_device_train_batch_size: 64
+    num_train_epochs: 1
+    per_device_train_batch_size: 8
     gradient_checkpointing: true
     gradient_checkpointing_kwargs: { "use_reentrant": false }
     # gradient_checkpointing: true
