@@ -1,6 +1,6 @@
 config:
   (): colpali_engine.trainer.colmodel_training.ColModelTrainingConfig
-  output_dir: !path ../../../models/right_pad/train_colpali-3b-pt-448
+  output_dir: !path ../../../models/colpali-pt-448-256
   processor:
     () : colpali_engine.utils.transformers_wrappers.AutoProcessorWrapper
     pretrained_model_name_or_path:  "./models/colpaligemma-3b-pt-448-base" # "./models/paligemma-3b-mix-448"
@@ -10,7 +10,8 @@ config:
     class_to_instanciate: !ext colpali_engine.models.ColPali
     pretrained_model_name_or_path: "./models/colpaligemma-3b-pt-448-base"
     torch_dtype:  !ext torch.bfloat16
-#    device_map: "auto"
+    attn_implementation: "flash_attention_2"
+  #    device_map: "auto"
 #    quantization_config:
 #      (): transformers.BitsAndBytesConfig
 #      load_in_4bit: true
@@ -26,7 +27,28 @@ config:
   
   loss_func:
     (): colpali_engine.loss.late_interaction_losses.ColbertPairwiseCELoss
-  tr_args: !import ../tr_args/default_tr_args.yaml
+  tr_args:
+    (): transformers.training_args.TrainingArguments
+    output_dir: null
+    overwrite_output_dir: true
+    num_train_epochs: 3
+    per_device_train_batch_size: 64
+    gradient_checkpointing: true
+    gradient_checkpointing_kwargs: { "use_reentrant": false }
+    # 6 x 8 gpus = 48 batch size
+    # gradient_accumulation_steps: 4
+    per_device_eval_batch_size: 64
+    eval_strategy: "steps"
+    dataloader_num_workers: 8
+    # bf16: true
+    save_steps: 500
+    logging_steps: 10
+    eval_steps: 100
+    warmup_steps: 100
+    learning_rate: 5e-4
+    save_total_limit: 1
+    resume_from_checkpoint: false
+    report_to: "wandb"
   peft_config:
     (): peft.LoraConfig
     r: 32
