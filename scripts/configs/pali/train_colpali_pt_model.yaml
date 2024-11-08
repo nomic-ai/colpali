@@ -4,7 +4,7 @@ config:
   processor:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
     class_to_instanciate: !ext colpali_engine.models.ColPaliProcessor
-    pretrained_model_name_or_path: "./models/paligemma-3b-pt-448"
+    pretrained_model_name_or_path: "./models/colpaligemma-3b-pt-448-base"
   model:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
     class_to_instanciate: !ext colpali_engine.models.ColPali
