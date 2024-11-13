@@ -14,7 +14,6 @@ config:
     torch_dtype:  !ext torch.bfloat16
     use_cache: false
     attn_implementation: "flash_attention_2"
-    pretrained_peft_model_name_or_path: "./models/biqwen2-docmatix-256"
 #    device_map: "auto"
 #    quantization_config:
 #      (): transformers.BitsAndBytesConfig
@@ -25,6 +24,7 @@ config:
 
   dataset_loading_func: !ext colpali_engine.utils.dataset_transformation.load_train_set
   eval_dataset_loader: !import ../data/test_data.yaml
+  pretrained_peft_model_name_or_path: "./models/biqwen2-docmatix-256"
 
   # max_length: 50
   run_eval: true
