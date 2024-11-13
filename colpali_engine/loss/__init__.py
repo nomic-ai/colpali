@@ -1,4 +1,5 @@
 from .bi_encoder_losses import (
+    BiEncoderInfoNCELoss,
     BiEncoderLoss,
     BiPairwiseCELoss,
     BiPairwiseNegativeCELoss,

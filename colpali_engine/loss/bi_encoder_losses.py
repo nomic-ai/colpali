@@ -19,6 +19,25 @@ class BiEncoderLoss(torch.nn.Module):
 
         return loss_rowwise
 
+class BiEncoderInfoNCELoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        # self.loss = NLLLoss()
+
+    def forward(self, query_embeddings, doc_embeddings):
+        """
+        query_embeddings: (batch_size, dim)
+        doc_embeddings: (batch_size, dim)
+        """
+        scores = torch.einsum("bd,cd->bc", query_embeddings, doc_embeddings)
+        # softmax
+        scores = F.softmax(scores, dim=1)
+        # keep only diag
+        scores = torch.diagonal(scores)
+        # loss is -log(diag)
+        loss = -torch.log(scores).mean()
+        return loss
+
 
 class BiPairwiseCELoss(torch.nn.Module):
     def __init__(self):
