@@ -1,6 +1,6 @@
 config:
   (): colpali_engine.trainer.colmodel_training.ColModelTrainingConfig
-  output_dir: !path ../../../models/biqwen2-docmatix-256-posttrained
+  output_dir: !path ../../../models/biqwen2-docmatix-256-posttrained-infonce
   processor:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
     class_to_instanciate: !ext colpali_engine.models.BiQwen2Processor
@@ -30,7 +30,7 @@ config:
   run_eval: true
   
   loss_func:
-    (): colpali_engine.loss.bi_encoder_losses.BiPairwiseCELoss
+    (): colpali_engine.loss.bi_encoder_losses.BiEncoderInfoNCELoss
   tr_args:
     (): transformers.training_args.TrainingArguments
     output_dir: null
