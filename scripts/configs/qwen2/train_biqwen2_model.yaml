@@ -1,10 +1,11 @@
 config:
   (): colpali_engine.trainer.colmodel_training.ColModelTrainingConfig
-  output_dir: !path ../../../models/biqwen2-infonce-256-3e
+  output_dir: !path ../../../models/biqwen2-1e
   processor:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
     class_to_instanciate: !ext colpali_engine.models.BiQwen2Processor
     pretrained_model_name_or_path:  "./models/colqwen2_base" # "./models/paligemma-3b-mix-448"
+    num_image_tokens: 1024
     # max_length: 50
 
   model:
@@ -29,12 +30,14 @@ config:
   run_eval: true
   
   loss_func:
-    (): colpali_engine.loss.bi_encoder_losses.BiEncoderInfoNCELoss
+    (): colpali_engine.loss.bi_encoder_losses.BiEncoderLoss
+    bidirectional: false
   tr_args:
     (): transformers.training_args.TrainingArguments
     output_dir: null
     overwrite_output_dir: true
-    num_train_epochs: 3
+    num_train_epochs: 1
+    # max_steps: 200
     per_device_train_batch_size: 64
     gradient_checkpointing: true
     gradient_checkpointing_kwargs: { "use_reentrant": false }
@@ -48,7 +51,7 @@ config:
     logging_steps: 10
     eval_steps: 100
     warmup_steps: 100
-    learning_rate: 5e-4
+    learning_rate: 5e-5
     save_total_limit: 1
     resume_from_checkpoint: false
     report_to: "wandb"

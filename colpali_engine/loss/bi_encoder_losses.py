@@ -4,9 +4,10 @@ from torch.nn import CrossEntropyLoss
 
 
 class BiEncoderLoss(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, bidirectional=False):
         super().__init__()
         self.ce_loss = CrossEntropyLoss()
+        self.bidirectional = bidirectional
 
     def forward(self, query_embeddings, doc_embeddings):
         """
@@ -15,9 +16,15 @@ class BiEncoderLoss(torch.nn.Module):
         """
 
         scores = torch.einsum("bd,cd->bc", query_embeddings, doc_embeddings)
-        loss_rowwise = self.ce_loss(scores, torch.arange(scores.shape[0], device=scores.device))
+        loss = self.ce_loss(scores, torch.arange(scores.shape[0], device=scores.device))
 
-        return loss_rowwise
+        if self.bidirectional:
+            # transpose the scores matrix
+            scores_t = scores.t()
+            loss_colwise = self.ce_loss(scores_t, torch.arange(scores_t.shape[0], device=scores_t.device))
+            loss = (loss + loss_colwise) / 2
+
+        return loss
 
 class BiEncoderInfoNCELoss(torch.nn.Module):
     def __init__(self):
