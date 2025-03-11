@@ -1,7 +1,5 @@
-from random import randint
 from typing import Any, Dict, List, Optional
 
-from PIL import Image
 
 from colpali_engine.collators.visual_retriever_collator import VisualRetrieverCollator
 from colpali_engine.utils.processing_utils import BaseVisualRetrieverProcessor

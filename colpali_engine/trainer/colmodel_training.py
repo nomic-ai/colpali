@@ -7,6 +7,7 @@ from transformers import (
     PreTrainedModel,
     TrainingArguments,
 )
+from transformers import set_seed
 
 from colpali_engine.collators import BEIRCollator, CorpusQueryCollator, VisualRetrieverCollator
 from colpali_engine.loss.late_interaction_losses import (
@@ -75,6 +76,7 @@ class ColModelTraining:
     """
 
     def __init__(self, config: ColModelTrainingConfig) -> None:
+        set_seed(42)
         self.config = config
         self.model = self.config.model
         self.current_git_hash = os.popen("git rev-parse HEAD").read().strip()
