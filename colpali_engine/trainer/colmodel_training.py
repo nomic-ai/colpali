@@ -8,7 +8,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from colpali_engine.collators import CorpusQueryCollator, VisualRetrieverCollator
+from colpali_engine.collators import BEIRCollator, CorpusQueryCollator, VisualRetrieverCollator
 from colpali_engine.loss.late_interaction_losses import (
     ColbertLoss,
 )
@@ -29,7 +29,6 @@ class ColModelTrainingConfig:
     peft_config: Optional[LoraConfig] = None
     loss_func: Optional[Callable] = ColbertLoss()
     dataset_loading_func: Optional[Callable] = None
-    eval_dataset_loader: Optional[Dict[str, Callable]] = None
     pretrained_peft_model_name_or_path: Optional[str] = None
     """
     Config class used for training a ColVision model.
@@ -84,15 +83,24 @@ class ColModelTraining:
         if isinstance(self.dataset, Tuple):
             print("Dataset has BEIR/hard negatives format. Using CorpusQueryCollator.")
             corpus_format = self.dataset[2]
-            neg_dataset = self.dataset[1]
-            self.dataset = self.dataset[0]
-            self.collator = CorpusQueryCollator(
-                processor=self.config.processor,
-                max_length=self.config.max_length,
-                image_dataset=neg_dataset,
-                mined_negatives=True,
-                corpus_format=corpus_format,
-            )
+            if corpus_format == "beir":
+                corpus = self.dataset[1]
+                self.dataset = self.dataset[0]
+                self.collator = BEIRCollator(
+                    processor=self.config.processor,
+                    max_length=self.config.max_length,
+                    corpus=corpus,
+                )
+            else:
+                neg_dataset = self.dataset[1]
+                self.dataset = self.dataset[0]
+                self.collator = CorpusQueryCollator(
+                    processor=self.config.processor,
+                    max_length=self.config.max_length,
+                    image_dataset=neg_dataset,
+                    mined_negatives=True,
+                    corpus_format=corpus_format,
+                )
         else:
             print("Dataset has QA format. Using VisualRetrieverCollator.")
             self.collator = VisualRetrieverCollator(
