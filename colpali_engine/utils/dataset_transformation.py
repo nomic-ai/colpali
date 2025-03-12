@@ -51,8 +51,7 @@ def reprocess_indices(corpus, queries, qrels) -> DatasetDict:
     return corpus, queries, qrels
 
 
-def load_vdsid_train_set() -> DatasetDict:
-    ds_name = "vdsid_beir_full_positive"
+def load_vdsid_train_set(ds_name: str) -> DatasetDict:
     base_path = "./data_dir/" if USE_LOCAL_DATASET else "vidore/"
     ds_path = base_path + ds_name
     corpus = cast(DatasetDict, load_dataset(ds_path, "corpus"))
@@ -68,19 +67,22 @@ def load_vdsid_train_set() -> DatasetDict:
     corpus["test"] = corpus["test"].map(add_corpus_id)
     new_corpus = concatenate_datasets([corpus["train"], corpus["test"]])
 
+    train_qrels_df = qrels["train"].to_pandas()
+    test_qrels_df = qrels["test"].to_pandas()
+
     def add_corpus_indexes_train(example):
         disable_progress_bar()
-        sub_qrels = qrels["train"].filter(lambda sub_example: sub_example["query_id"] == example["query_id"])
+        sub_qrels = train_qrels_df[train_qrels_df["query_id"] == example["query_id"]]
         enable_progress_bar()
-        positive_docs = [(qrel["corpus_id"], qrel["score"]) for qrel in sub_qrels]
+        positive_docs = [(x.corpus_id, x.score) for x in sub_qrels.itertuples()]
         example["positive_docs"] = positive_docs
         return example
 
     def add_corpus_indexes_test(example):
         disable_progress_bar()
-        sub_qrels = qrels["test"].filter(lambda sub_example: sub_example["query_id"] == example["query_id"])
+        sub_qrels = test_qrels_df[test_qrels_df["query_id"] == example["query_id"]]
         enable_progress_bar()
-        positive_docs = [(qrel["corpus_id"] + corpus_train_length, qrel["score"]) for qrel in sub_qrels]
+        positive_docs = [(x.corpus_id + corpus_train_length, x.score) for x in sub_qrels.itertuples()]
         example["positive_docs"] = positive_docs
         return example
 
@@ -90,6 +92,16 @@ def load_vdsid_train_set() -> DatasetDict:
     new_queries = DatasetDict({"train": queries["train"], "test": queries["test"]})
 
     return new_queries, new_corpus, "beir"
+
+
+def load_vdsid_train_set_big() -> DatasetDict:
+    ds_name = "vdsid_beir_full_positive"
+    return load_vdsid_train_set(ds_name)
+
+
+def load_vdsid_train_set_small() -> DatasetDict:
+    ds_name = "vdsid_beir_full_positive_small"
+    return load_vdsid_train_set(ds_name)
 
 
 def load_train_set_detailed() -> DatasetDict:
