@@ -1,3 +1,4 @@
+trainer_output*
 wandb
 # Custom
 !*/configs/data/

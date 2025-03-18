@@ -1,21 +1,42 @@
 import torch
+import torch.distributed.nn
+import torch.distributed as dist
 import torch.nn.functional as F  # noqa: N812
 from torch.nn import CrossEntropyLoss
 
+def gather_with_grad(t):
+    if not dist.is_initialized() or dist.get_world_size() == 1:
+        return t
+
+    if t.ndim == 0:
+        t = t.unsqueeze(0)
+
+    return torch.cat(torch.distributed.nn.all_gather(t), dim=0)
+
 
 class BiEncoderLoss(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, temperature: float = 0.02):
         super().__init__()
         self.ce_loss = CrossEntropyLoss()
+        self.temperature = temperature
 
     def forward(self, query_embeddings, doc_embeddings):
         """
         query_embeddings: (batch_size, dim)
         doc_embeddings: (batch_size, dim)
         """
+        if not dist.is_initialized() or dist.get_world_size() == 1:
+            gathered_docs = doc_embeddings
+        else:
+            gathered_docs = gather_with_grad(doc_embeddings)
 
-        scores = torch.einsum("bd,cd->bc", query_embeddings, doc_embeddings)
-        loss_rowwise = self.ce_loss(scores, torch.arange(scores.shape[0], device=scores.device))
+        scores = torch.einsum("bd,cd->bc", query_embeddings, gathered_docs)
+        labels = torch.arange(scores.shape[0], device=scores.device)
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        num_logits = scores.shape[0]
+        labels = labels + rank * num_logits
+
+        loss_rowwise = self.ce_loss(scores / self.temperature, labels) * dist.get_world_size()
 
         return loss_rowwise
 

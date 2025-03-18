@@ -3,14 +3,14 @@ config:
   output_dir: !path ../../../models/colqwen2_5_train
   processor:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
-    class_to_instanciate: !ext colpali_engine.models.ColQwen2_5_Processor
+    class_to_instanciate: !ext colpali_engine.models.BiQwen2_5_Processor
     pretrained_model_name_or_path:  "Qwen/Qwen2.5-VL-3B-Instruct" # "./models/paligemma-3b-mix-448"
     # num_image_tokens: 2048
     # max_length: 50
 
   model:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
-    class_to_instanciate: !ext colpali_engine.models.ColQwen2_5
+    class_to_instanciate: !ext colpali_engine.models.BiQwen2_5
     pretrained_model_name_or_path: "Qwen/Qwen2.5-VL-3B-Instruct"
     torch_dtype:  !ext torch.bfloat16
     use_cache: false
@@ -29,15 +29,17 @@ config:
   # max_length: 50
   run_eval: true
   loss_func:
-    (): colpali_engine.loss.late_interaction_losses.ColbertPairwiseCELoss
+    (): colpali_engine.loss.bi_encoder_losses.BiEncoderLoss
   tr_args:
     (): transformers.training_args.TrainingArguments
     output_dir: null
     overwrite_output_dir: true
-    num_train_epochs: 3
+    num_train_epochs: 1 
     per_device_train_batch_size: 32
     gradient_checkpointing: true
     gradient_checkpointing_kwargs: { "use_reentrant": false }
+    ddp_find_unused_parameters: false
+    resume_from_checkpoint: false
     # gradient_checkpointing: true
     # 6 x 8 gpus = 48 batch size
     # gradient_accumulation_steps: 4
@@ -48,15 +50,14 @@ config:
     save_steps: 500
     logging_steps: 10
     eval_steps: 100
-    warmup_steps: 500
+    warmup_ratio: 0.01
     learning_rate: 1e-4
     save_total_limit: 1
     # resume_from_checkpoint: true
     # optim: "paged_adamw_8bit"
     # wandb logging
-    wandb_project: "colqwen2"
-    # run_name: "colqwen2-ba32-nolora"
-    report_to: "wandb"
+    run_name: "biqwen2_5-256bs-1ep-pool-eos-left-pad"
+    report_to: "none"
 
 
   peft_config:
