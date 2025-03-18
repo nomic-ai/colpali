@@ -1,8 +1,9 @@
 import torch
-import torch.distributed.nn
 import torch.distributed as dist
+import torch.distributed.nn
 import torch.nn.functional as F  # noqa: N812
 from torch.nn import CrossEntropyLoss
+
 
 def gather_with_grad(t):
     if not dist.is_initialized() or dist.get_world_size() == 1:

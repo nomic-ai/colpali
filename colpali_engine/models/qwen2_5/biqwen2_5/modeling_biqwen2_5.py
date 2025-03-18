@@ -130,7 +130,7 @@ class BiQwen2_5(Qwen2_5_VLForConditionalGeneration):  # noqa: N801
             # Mean pooling over sequence length
             mask = kwargs["attention_mask"].unsqueeze(-1)  # (batch_size, sequence_length, 1)
             pooled_output = (last_hidden_states * mask).sum(dim=1) / mask.sum(dim=1)  # (batch_size, hidden_size)
-        
+
         # Project to lower dimension
         proj = self.custom_text_proj(pooled_output)  # (batch_size, dim)
 
