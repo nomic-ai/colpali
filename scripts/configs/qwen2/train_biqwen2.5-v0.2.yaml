@@ -1,6 +1,6 @@
 config:
   (): colpali_engine.trainer.colmodel_training.ColModelTrainingConfig
-  output_dir: !path ../../../models/colqwen2_5_train
+  output_dir: !path ../../../models/biqwen2_5_1ep_2048_same_source_2e4
   processor:
     (): colpali_engine.utils.transformers_wrappers.AllPurposeWrapper
     class_to_instanciate: !ext colpali_engine.models.BiQwen2_5_Processor
@@ -23,7 +23,7 @@ config:
 #      bnb_4bit_compute_dtype:  "bfloat16"
 #      bnb_4bit_use_double_quant: true
 
-  dataset_loading_func: !ext colpali_engine.utils.dataset_transformation.load_train_set
+  dataset_loading_func: !ext colpali_engine.utils.dataset_transformation.load_train_set_split_by_source
   eval_dataset_loader: !import ../data/test_data.yaml
 
   # max_length: 50
@@ -35,7 +35,7 @@ config:
     output_dir: null
     overwrite_output_dir: true
     num_train_epochs: 1 
-    per_device_train_batch_size: 32
+    per_device_train_batch_size: 512 
     gradient_checkpointing: true
     gradient_checkpointing_kwargs: { "use_reentrant": false }
     ddp_find_unused_parameters: false
@@ -44,20 +44,22 @@ config:
     # 6 x 8 gpus = 48 batch size
     # gradient_accumulation_steps: 4
     per_device_eval_batch_size: 16
-    eval_strategy: "steps"
-    dataloader_num_workers: 8
+    eval_strategy: "no"
+    dataloader_num_workers: 0
+    accelerator_config:
+      split_batches: true
     # bf16: true
     save_steps: 500
     logging_steps: 10
     eval_steps: 100
     warmup_ratio: 0.01
-    learning_rate: 1e-4
+    learning_rate: 2e-4
     save_total_limit: 1
     # resume_from_checkpoint: true
     # optim: "paged_adamw_8bit"
     # wandb logging
-    run_name: "biqwen2_5-256bs-1ep-pool-eos-left-pad"
-    report_to: "none"
+    run_name: "biqwen2_5_1ep_2048_same_source_2e4"
+    report_to: "wandb"
 
 
   peft_config:

@@ -20,6 +20,10 @@ def load_train_set() -> DatasetDict:
     ds_dict = cast(DatasetDict, load_dataset(base_path + ds_path))
     return ds_dict
 
+def load_train_set_split_by_source() -> DatasetDict:
+    ds_dict = cast(DatasetDict, load_dataset("nomic-ai/colpali_train_set_split_by_source"))
+    return {"train": ds_dict, "test": None}
+
 
 def load_train_set_detailed() -> DatasetDict:
     ds_paths = [
