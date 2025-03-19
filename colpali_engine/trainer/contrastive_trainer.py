@@ -44,33 +44,70 @@ class SingleDatasetBatchSampler(BatchSampler):
         ]
         self.current_positions = [0] * len(datasets)
 
+        self.available_datasets = list(range(len(datasets)))
+        self.max_positions = [(size // self.global_batch_size) * self.global_batch_size 
+                                 for size in self.dataset_sizes]
+
     def __iter__(self) -> Iterator[List[int]]:
-        while True:
-            # Randomly select a dataset
-            dataset_idx = torch.randint(len(self.datasets), size=(1,), generator=self.generator).item()
+        # Reset current positions and available datasets
+        self.current_positions = [0] * len(self.datasets)
+        self.available_datasets = list(range(len(self.datasets)))
+        
+        while self.available_datasets:
+            # Randomly select from available datasets
+            dataset_idx_index = torch.randint(len(self.available_datasets), size=(1,), generator=self.generator).item()
+            dataset_idx = self.available_datasets[dataset_idx_index]
             
             # Get indices for the current dataset
             dataset_indices = self.indices_per_dataset[dataset_idx]
             current_pos = self.current_positions[dataset_idx]
             
-            # Get batch indices
-            batch_indices = [
-                idx + self.cumsum_sizes[dataset_idx]
-                for idx in dataset_indices[current_pos:current_pos + self.global_batch_size]
-            ]
-            # Update position
-            self.current_positions[dataset_idx] = current_pos + self.global_batch_size
-            yield batch_indices
+            # Check if we have enough samples for a full batch
+            end_pos = current_pos + self.global_batch_size
+            
+            if end_pos <= self.max_positions[dataset_idx]:
+                # Get batch indices
+                batch_indices = [
+                    idx + self.cumsum_sizes[dataset_idx]
+                    for idx in dataset_indices[current_pos:end_pos]
+                ]
+                
+                # Update position
+                self.current_positions[dataset_idx] = end_pos
+                
+                # If dataset is exhausted, remove from available datasets
+                if end_pos >= self.max_positions[dataset_idx]:
+                    self.available_datasets.remove(dataset_idx)
+                
+                yield batch_indices
+            else:
+                # This dataset doesn't have enough samples for another batch
+                self.available_datasets.remove(dataset_idx)
+
+    def set_epoch(self, epoch):
+        """
+        Sets the epoch for this sampler. Important when using with multiple workers.
+        
+        Args:
+            epoch (int): Epoch number
+        """
+        # Set seed based on epoch to ensure different shuffling each epoch
+        torch_gen = torch.Generator()
+        torch_gen.manual_seed(self.generator.initial_seed() + epoch)
+        
+        # Reshuffle indices for each dataset
+        self.indices_per_dataset = [
+            torch.randperm(size, generator=torch_gen).tolist()
+            for size in self.dataset_sizes
+        ]
+
 
     @property
     def batch_size(self) -> int:
         return self.global_batch_size
 
     def __len__(self) -> int:
-        if self.drop_last:
-            return sum(size // self.global_batch_size for size in self.dataset_sizes)
-        else:
-            return sum((size + self.global_batch_size - 1) // self.global_batch_size for size in self.dataset_sizes)
+        return sum(size // self.global_batch_size for size in self.dataset_sizes)
 
 
 class ContrastiveTrainer(Trainer):
@@ -83,7 +120,7 @@ class ContrastiveTrainer(Trainer):
                 if len(dataset_list[i]) % batch_size != 0:
                     total_samples = (len(dataset_list[i]) // batch_size) * batch_size
                     dataset_list[i] = dataset_list[i].take(total_samples)
-            
+
             kwargs["train_dataset"] = ConcatDataset(dataset_list)
         else:
             dataset_list = None
@@ -129,7 +166,8 @@ class ContrastiveTrainer(Trainer):
             dataloader_params["worker_init_fn"] = seed_worker
             dataloader_params["prefetch_factor"] = self.args.dataloader_prefetch_factor
 
-        return self.accelerator.prepare(DataLoader(train_dataset, **dataloader_params))
+        dataloader = self.accelerator.prepare(DataLoader(train_dataset, **dataloader_params))
+        return dataloader
 
         
     def _get_train_sampler(self):
