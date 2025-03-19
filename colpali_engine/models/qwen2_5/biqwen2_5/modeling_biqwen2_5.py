@@ -16,8 +16,8 @@ class BiQwen2_5(Qwen2_5_VLForConditionalGeneration):  # noqa: N801
 
     def __init__(self, config: Qwen2_5_VLConfig):
         super().__init__(config=config)
-        self.dim = 128
-        self.custom_text_proj = nn.Linear(self.model.config.hidden_size, self.dim)
+        # self.dim = 128
+        # self.custom_text_proj = nn.Linear(self.model.config.hidden_size, self.dim)
         self.padding_side = "left"
         self.post_init()
 
@@ -132,7 +132,8 @@ class BiQwen2_5(Qwen2_5_VLForConditionalGeneration):  # noqa: N801
             pooled_output = (last_hidden_states * mask).sum(dim=1) / mask.sum(dim=1)  # (batch_size, hidden_size)
 
         # Project to lower dimension
-        proj = self.custom_text_proj(pooled_output)  # (batch_size, dim)
+        # proj = self.custom_text_proj(pooled_output)  # (batch_size, dim)
+        proj = pooled_output
 
         # # L2 normalization
         proj = proj / proj.norm(dim=-1, keepdim=True)
