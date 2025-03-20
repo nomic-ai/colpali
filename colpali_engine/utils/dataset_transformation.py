@@ -23,7 +23,7 @@ def load_train_set() -> DatasetDict:
     
 def load_train_set_colpali_vdr() -> DatasetDict:
     ds_paths = [
-        ("vidore/colpali_train_set", "train"),
+        ("nomic-ai/colpali_train_set_split_by_source", None),
         ("nomic-ai/vdr-multilingula-train", "it"),
         ("nomic-ai/vdr-multilingula-train", "en"),
         ("nomic-ai/vdr-multilingula-train", "fr"),
@@ -33,8 +33,12 @@ def load_train_set_colpali_vdr() -> DatasetDict:
     ds_tot = {}
     
     for (path, split) in ds_paths:
-        ds = cast(Dataset, load_dataset(path, split=split, num_proc=4))
-        ds_tot[path.split("/")[1]] = ds
+        if split is None:
+            ds = cast(DatasetDict, load_dataset(path, num_proc=4))
+            ds_tot = {**ds_tot, **ds}
+        else:
+            ds = cast(Dataset, load_dataset(path, split=split, num_proc=4))
+            ds_tot[f'{path.split("/")[1]}_{split}'] = ds
             
     dataset = cast(DatasetDict, DatasetDict(ds_tot))
     
