@@ -30,19 +30,15 @@ def load_train_set_colpali_vdr() -> DatasetDict:
         ("nomic-ai/vdr-multilingula-train", "de"),
         ("nomic-ai/vdr-multilingula-train", "es"),
     ]
-    ds_tot = []
+    ds_tot = {}
     
     for (path, split) in ds_paths:
         ds = cast(Dataset, load_dataset(path, split=split, num_proc=4))
-        ds_tot.append(ds)
+        ds_tot[path.split("/")[1]] = ds
             
-    dataset = cast(Dataset, concatenate_datasets(ds_tot))
+    dataset = cast(DatasetDict, DatasetDict(ds_tot))
     
-    dataset = dataset.shuffle(seed=42)
-    # split into train and test
-    dataset_eval = dataset.select(range(500))
-    dataset = dataset.select(range(500, len(dataset)))
-    ds_dict = DatasetDict({"train": dataset, "test": dataset_eval})
+    ds_dict = DatasetDict({"train": dataset, "test": None})
     return ds_dict
 
 def load_train_set_split_by_source() -> DatasetDict:
