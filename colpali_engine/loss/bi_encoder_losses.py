@@ -1,18 +1,8 @@
 import torch
 import torch.distributed as dist
-import torch.distributed.nn
 import torch.nn.functional as F  # noqa: N812
 from torch.nn import CrossEntropyLoss
-
-
-def gather_with_grad(t):
-    if not dist.is_initialized() or dist.get_world_size() == 1:
-        return t
-
-    if t.ndim == 0:
-        t = t.unsqueeze(0)
-
-    return torch.cat(torch.distributed.nn.all_gather(t), dim=0)
+from colpali_engine.utils.distributed import gather_with_grad
 
 
 class BiEncoderLoss(torch.nn.Module):

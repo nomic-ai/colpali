@@ -1,6 +1,8 @@
 import torch
 import torch.nn.functional as F  # noqa: N812
+import torch.distributed as dist
 from torch.nn import CrossEntropyLoss
+from colpali_engine.utils.distributed import gather_with_grad
 
 
 class ColbertLoss(torch.nn.Module):
@@ -49,20 +51,39 @@ class ColbertPairwiseCELoss(torch.nn.Module):
 
         Positive scores are the diagonal of the scores matrix.
         """
+        if dist.is_initialized() and dist.get_world_size() > 1:
+            # if gathering, doc_embeddings will be (batch_size * world_size, num_doc_tokens, dim)
+            doc_embeddings = gather_with_grad(doc_embeddings)
 
         # Compute the ColBERT scores
         scores = (
             torch.einsum("bnd,csd->bcns", query_embeddings, doc_embeddings).max(dim=3)[0].sum(dim=2)
-        )  # (batch_size, batch_size)
+        )  # (batch_size, doc_embeddings_batch_size)
 
         # Positive scores are the diagonal of the scores matrix.
-        pos_scores = scores.diagonal()  # (batch_size,)
+        if query_embeddings.shape[0] != doc_embeddings.shape[0]:
+            batch_size = query_embeddings.shape[0]
+            labels = torch.arange(batch_size, device=scores.device)
+            rank = dist.get_rank() if dist.is_initialized() else 0
+            num_logits = scores.shape[0]
+            labels = labels + rank * num_logits
+            pos_scores = scores[torch.arange(batch_size), labels]
 
-        # Negative score for a given query is the maximum of the scores against all all other pages.
-        # NOTE: We exclude the diagonal by setting it to a very low value: since we know the maximum score is 1,
-        # we can subtract 1 from the diagonal to exclude it from the maximum operation.
-        neg_scores = scores - torch.eye(scores.shape[0], device=scores.device) * 1e6  # (batch_size, batch_size)
-        neg_scores = neg_scores.max(dim=1)[0]  # (batch_size,)
+            # neg scores are compared against all other pages except pos scores
+            ignore_pos = torch.zeros((query_embeddings.shape[0], doc_embeddings.shape[0]), device=scores.device)
+            # TOOD: double check
+            ignore_pos[torch.arange(batch_size), labels] = 1
+            neg_scores = scores - ignore_pos * 1e6
+            neg_scores = neg_scores.max(dim=1)[0]
+
+        else:
+            pos_scores = scores.diagonal()  # (batch_size,)
+
+            # Negative score for a given query is the maximum of the scores against all all other pages.
+            # NOTE: We exclude the diagonal by setting it to a very low value: since we know the maximum score is 1,
+            # we can subtract 1 from the diagonal to exclude it from the maximum operation.
+            neg_scores = scores - torch.eye(scores.shape[0], device=scores.device) * 1e6  # (batch_size, batch_size)
+            neg_scores = neg_scores.max(dim=1)[0]  # (batch_size,)
 
         # Compute the loss
         # The loss is computed as the negative log of the softmax of the positive scores
