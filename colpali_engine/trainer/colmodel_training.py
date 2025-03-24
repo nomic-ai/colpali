@@ -92,6 +92,7 @@ class ColModelTraining:
                 image_dataset=neg_dataset,
                 mined_negatives=True,
                 corpus_format=corpus_format,
+                num_negatives=4
             )
         else:
             print("Dataset has QA format. Using VisualRetrieverCollator.")

@@ -3,7 +3,7 @@ from typing import List, Tuple, cast
 
 from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
 
-USE_LOCAL_DATASET = os.environ.get("USE_LOCAL_DATASET", "1") == "1"
+USE_LOCAL_DATASET = os.environ.get("USE_LOCAL_DATASET", "0") == "1"
 
 
 def add_metadata_column(dataset, column_name, value):
@@ -144,19 +144,19 @@ def load_wikiss() -> Tuple[DatasetDict, Dataset, str]:
 def load_train_set_ir_negs() -> Tuple[DatasetDict, Dataset, str]:
     """Returns the query dataset, then the anchor dataset with the documents, then the dataset type"""
     base_path = "./data_dir/" if USE_LOCAL_DATASET else "manu/"
-    dataset = cast(Dataset, load_dataset(base_path + "colpali-queries", split="train"))
+    dataset = cast(Dataset, load_dataset("nomic-ai/colpali-queries-mined-20250321-by-source"))
 
     print("Dataset size:", len(dataset))
     # filter out queries with "gold_in_top_100" == False
-    dataset = dataset.filter(lambda x: x["gold_in_top_100"], num_proc=16)
-    print("Dataset size after filtering:", len(dataset))
+    # dataset = dataset.filter(lambda x: x["gold_in_top_100"], num_proc=16)
+    # print("Dataset size after filtering:", len(dataset))
 
     # keep only top 20 negative passages
     dataset = dataset.map(lambda x: {"negative_passages": x["negative_passages"][:20]})
 
-    dataset_eval = dataset.select(range(500))
-    dataset = dataset.select(range(500, len(dataset)))
-    ds_dict = DatasetDict({"train": dataset, "test": dataset_eval})
+    # dataset_eval = dataset.select(range(500))
+    # dataset = dataset.select(range(500, len(dataset)))
+    ds_dict = DatasetDict({"train": dataset, "test": None})
 
     anchor_ds = cast(Dataset, load_dataset(base_path + "colpali-corpus", split="train"))
     return ds_dict, anchor_ds, "vidore"

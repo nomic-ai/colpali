@@ -86,7 +86,7 @@ class SingleDatasetBatchSampler(BatchSampler):
 
     def set_epoch(self, epoch):
         """
-        Sets the epoch for this sampler. Important when using with multiple workers.
+        Sets the epoch for this sampler. 
         
         Args:
             epoch (int): Epoch number
@@ -141,8 +141,8 @@ class ContrastiveTrainer(Trainer):
 
         Subclass and override this method if you want to inject some custom behavior.
         """
-        if self.train_dataset is None:
-            raise ValueError("Trainer: training requires a train_dataset.")
+        if self.dataset_list is None:
+            return super().get_train_dataloader()
 
         train_dataset = self.train_dataset
         data_collator = self.data_collator
@@ -171,6 +171,9 @@ class ContrastiveTrainer(Trainer):
 
         
     def _get_train_sampler(self):
+        if self.dataset_list is None:
+            return super()._get_train_sampler()
+
         generator = torch.Generator()
         generator.manual_seed(self.args.seed)
         return SingleDatasetBatchSampler(

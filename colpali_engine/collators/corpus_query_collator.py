@@ -24,6 +24,7 @@ class CorpusQueryCollator(VisualRetrieverCollator):
         image_dataset: Optional["Dataset"] = None,  # noqa: F821
         mined_negatives: bool = True,
         corpus_format: str = "wikiss",
+        num_negatives: int = 1,
     ):
         super().__init__(processor=processor, max_length=max_length)
         if image_dataset is None:
@@ -31,6 +32,7 @@ class CorpusQueryCollator(VisualRetrieverCollator):
         self.image_dataset = image_dataset
         self.mined_negatives = mined_negatives
         self.corpus_format = corpus_format
+        self.num_negatives = num_negatives
 
         if self.corpus_format == "wikiss":
             print("Mapping docids to indices")
@@ -73,14 +75,15 @@ class CorpusQueryCollator(VisualRetrieverCollator):
                 negative_candidates = example["negative_passages"]
                 if not negative_candidates:
                     raise ValueError("No negative passages available")
-                chosen_negative = negative_candidates[randint(0, len(negative_candidates) - 1)]
+                # chosen_negative = negative_candidates[randint(0, len(negative_candidates) - 1)]
+                chosen_negative = negative_candidates[:self.num_negatives]
                 if self.corpus_format in {"wikiss", "docmatix"}:
-                    negative_docid = chosen_negative["docid"]
+                    negative_docid = [c["docid"] for c in chosen_negative]
                 elif self.corpus_format == "vidore":
-                    negative_docid = chosen_negative
+                    negative_docid = [c for c in chosen_negative]
                 else:
                     raise NotImplementedError(f"Corpus format {self.corpus_format} not supported")
-                sample["neg_image"] = self.get_image_from_docid(negative_docid)
+                sample["neg_image"] = [self.get_image_from_docid(d) for d in negative_docid]
 
             processed_examples.append(sample)
 

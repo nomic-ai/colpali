@@ -59,11 +59,12 @@ class VisualRetrieverCollator:
 
             neg_image = example.get("neg_image")
             if neg_image is not None:
-                neg_images.append(cast(Image, neg_image))
-
+                # append list of negative images to documents
+                # will handle neg_doc in process_images and in loss function
+                images.extend(cast(List[Image], neg_image))
         # Process images.
         batch_doc = self.processor.process_images(images=images)
-        batch_neg_doc = self.processor.process_images(images=neg_images) if neg_images else None
+        # batch_neg_doc = self.processor.process_images(images=neg_images) if neg_images else None
 
         # Process queries.
         if all(q is None for q in texts_query):
@@ -80,7 +81,7 @@ class VisualRetrieverCollator:
         batch_all = prefix_keys(batch_doc, "doc_")
         if batch_query:
             batch_all.update(prefix_keys(batch_query, "query_"))
-        if batch_neg_doc:
-            batch_all.update(prefix_keys(batch_neg_doc, "neg_doc_"))
+        # if batch_neg_doc:
+        #     batch_all.update(prefix_keys(batch_neg_doc, "neg_doc_"))
 
         return batch_all

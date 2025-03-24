@@ -36,6 +36,16 @@ class BiEncoderLoss(torch.nn.Module):
         rank = dist.get_rank() if dist.is_initialized() else 0
         num_logits = scores.shape[0]
         labels = labels + rank * num_logits
+        # since we only gather the documents across GPUs
+        # if we have negatives, doc_embeddigns.size(0) > (query_embeddings.size(0) * dist.get_world_size())
+        # and need to shift positive labels accordingly
+        # e.g.
+        # q1 im1 neg1 neg2
+        # q2 im2 neg3 neg4
+        # q3 im3 neg5 neg6
+        # the similarity will be shape [3, 9]
+        # and labels will be [0, 3, 6]
+        labels = labels * (gathered_docs.size(0) // (query_embeddings.size(0) * dist.get_world_size()))
 
         loss_rowwise = self.ce_loss(scores / self.temperature, labels) * dist.get_world_size()
 
