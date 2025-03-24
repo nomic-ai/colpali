@@ -6,28 +6,31 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from colpali_engine.models import BiQwen2, BiQwen2Processor
-from colpali_engine.utils.dataset_transformation import load_train_set
+from colpali_engine.models import BiQwen2_5, BiQwen2_5_Processor
+from colpali_engine.utils.dataset_transformation import load_train_set_colpali_vdr, load_train_set
+from pathlib import Path
 
 train_set = load_train_set()
 
 
-COMPUTE_EMBEDDINGS = False
-COMPUTE_HARDNEGS = False
+COMPUTE_EMBEDDINGS = True
+COMPUTE_HARDNEGS = True
 
 if COMPUTE_HARDNEGS or COMPUTE_EMBEDDINGS:
     print("Loading base model")
-    model = BiQwen2.from_pretrained(
-        "./models/biqwen2-warmup-256-newpad-0e",
+    model = BiQwen2_5.from_pretrained(
+        "./models/biqwen2_5_1ep_2048_same_source_2e4_vdr_colipali_by_source-best-20250321",
         torch_dtype=torch.bfloat16,
         device_map="cuda",
         attn_implementation="flash_attention_2" if torch.cuda.is_available() else None,
     ).eval()
 
     print("Loading processor")
-    processor = BiQwen2Processor.from_pretrained("./models/biqwen2-warmup-256-newpad-0e")
+    processor = BiQwen2_5_Processor.from_pretrained("./models/biqwen2_5_1ep_2048_same_source_2e4_vdr_colipali_by_source-best-20250321")
 
-if COMPUTE_EMBEDDINGS:
+parent_dir = Path("data_dir")
+parent_dir.mkdir(exist_ok=True, parents=True)
+if COMPUTE_EMBEDDINGS and not Path(parent_dir / "filtered_dataset_embeddings.pt").exists():
     print("Loading images")
     print("Images loaded")
 
@@ -68,11 +71,18 @@ if COMPUTE_EMBEDDINGS:
     ds = torch.stack(ds)
 
     # save embeddings
-    torch.save(ds, "data_dir/filtered_dataset_embeddings.pt")
+    torch.save(ds, parent_dir / "filtered_dataset_embeddings.pt")
 
-if not COMPUTE_EMBEDDINGS:
-    ds = torch.load("data_dir/filtered_dataset_embeddings.pt")
+if not COMPUTE_EMBEDDINGS or (parent_dir / "filtered_dataset_embeddings.pt").exists():
+    ds = torch.load(parent_dir / "filtered_dataset_embeddings.pt")
 
+# in case embeddings don't have an exact norm of 1
+ds = ds / torch.norm(ds, dim=1, keepdim=True)
+
+filtered_dataset = datasets.load_from_disk(parent_dir / "filtered_dataset")
+filenames = list(filtered_dataset["image_filename"])
+
+margin = 0.95
 
 if COMPUTE_HARDNEGS:
     # compute hard negatives
@@ -80,9 +90,9 @@ if COMPUTE_HARDNEGS:
 
     # iterate on the train set
     mined_hardnegs = []
-
-    for i in tqdm(range(0, len(train_set["train"]), 8)):
-        samples = train_set["train"][i : i + 8]
+    chunk_size = 512
+    for i in tqdm(range(0, len(train_set["train"]), chunk_size), desc="Computing hard negatives"):
+        samples = train_set["train"][i : i + chunk_size]
         batch_query = processor.process_queries(samples["query"])
         with torch.no_grad():
             batch_query = {k: v.to(model.device) for k, v in batch_query.items()}
@@ -90,25 +100,31 @@ if COMPUTE_HARDNEGS:
 
         # compute scores
         scores = torch.einsum("bd,cd->bc", embeddings_query, ds)
-        # get top 100 indexes
-        top100 = scores.topk(100, dim=1).indices
+        pos_idxs = [filenames.index(example) for example in samples['image_filename']]
+        pos_scores = scores[torch.arange(len(pos_idxs)), pos_idxs]
+
+        # Create mask for scores less than positive score * margin
+        pos_scores_expanded = pos_scores.unsqueeze(1).expand(-1, scores.size(1))
+        valid_scores_mask = scores < (pos_scores_expanded * margin)
+        # Set invalid scores to -inf so they won't be selected
+        masked_scores = scores.clone()
+        masked_scores[~valid_scores_mask] = float('-inf')
+        
+        # Get top 100 indexes from valid scores
+        top100 = masked_scores.topk(min(100, valid_scores_mask.sum(dim=1).max().item()), dim=1).indices
         # indices to list
         top100 = top100.tolist()
         # append to mined_hardnegs
         mined_hardnegs.extend(top100)
 
     # save mined hardnegs as txt
-    with open("data_dir/mined_hardnegs_filtered.txt", "w") as f:
+    with open(parent_dir / "mined_hardnegs_filtered.txt", "w") as f:
         for item in mined_hardnegs:
             f.write("%s\n" % item)
 
 
-with open("data_dir/mined_hardnegs_filtered.txt") as f:
+with open(parent_dir / "mined_hardnegs_filtered.txt") as f:
     mined_hardnegs = f.readlines()
-
-
-filtered_dataset = datasets.load_from_disk("data_dir/filtered_dataset")
-filenames = list(filtered_dataset["image_filename"])
 
 
 def mapper_fn(example, idx):
@@ -121,6 +137,7 @@ def mapper_fn(example, idx):
     tmp["gold_in_top_100"] = tmp["positive_passages"][0] in tmp["negative_passages"]
     # remove gold index from negs if it is there
     if tmp["gold_in_top_100"]:
+        print("WTF!!!!!!!!!!!!!")
         tmp["negative_passages"].remove(tmp["positive_passages"][0])
     return tmp
 
@@ -128,4 +145,4 @@ def mapper_fn(example, idx):
 final_dataset = train_set["train"].map(mapper_fn, with_indices=True, num_proc=16)
 # drop image
 final_dataset = final_dataset.remove_columns("image")
-final_dataset.save_to_disk("data_dir/final_dataset")
+final_dataset.save_to_disk(parent_dir / "final_dataset")
