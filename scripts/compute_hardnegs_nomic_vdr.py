@@ -92,12 +92,13 @@ for lang in train_sets:
 
     margin = 0.95
 
-    if COMPUTE_HARDNEGS and not Path(parent_dir / "mined_hardnegs_filtered.txt").exists():
+    if COMPUTE_HARDNEGS:
         # compute hard negatives
         ds = cast(torch.Tensor, ds).to("cuda")
 
         # iterate on the train set
         mined_hardnegs = []
+        negatives = []
         chunk_size = 512
         #
         train_queries = load_dataset("nomic-ai/vdr-multilingula-train", split=lang.split("_")[-1])
@@ -127,10 +128,18 @@ for lang in train_sets:
             top100 = top100.tolist()
             # append to mined_hardnegs
             mined_hardnegs.extend(top100)
+            neg_files = []
+            for idxs in top100:
+                neg_files.append([filenames[idx] for idx in idxs])
+            negatives.extend(neg_files)
 
         # save mined hardnegs as txt
         with open(parent_dir / "mined_hardnegs_filtered.txt", "w") as f:
             for item in mined_hardnegs:
+                f.write("%s\n" % item)
+
+        with open(parent_dir / "negatives.txt", "w") as f:
+            for item in negatives: 
                 f.write("%s\n" % item)
 
     else:
@@ -141,10 +150,15 @@ for lang in train_sets:
     with open(parent_dir / "mined_hardnegs_filtered.txt") as f:
         mined_hardnegs = f.readlines()
 
+    with open(parent_dir / "negatives.txt") as f:
+        negatives = f.readlines()
+
 
     def mapper_fn(example, idx):
         tmp = {
+            # ignore brackets in list written to text file
             "negative_passages": [int(x) for x in mined_hardnegs[idx][1:-2].strip().split(",")],
+            "negatives": [x for x in negatives[idx][1:-2].strip().split(",")],
             "query": example["query"],
             "positive_passages": [filenames.index(example["image_filename"])],
         }
