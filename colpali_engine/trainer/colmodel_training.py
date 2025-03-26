@@ -31,6 +31,7 @@ class ColModelTrainingConfig:
     dataset_loading_func: Optional[Callable] = None
     eval_dataset_loader: Optional[Dict[str, Callable]] = None
     pretrained_peft_model_name_or_path: Optional[str] = None
+    num_negatives: int = 1
     """
     Config class used for training a ColVision model.
     """
@@ -80,7 +81,6 @@ class ColModelTraining:
         self.model = self.config.model
         self.current_git_hash = os.popen("git rev-parse HEAD").read().strip()
         self.dataset = self.config.dataset_loading_func()
-
         if isinstance(self.dataset, Tuple):
             print("Dataset has BEIR/hard negatives format. Using CorpusQueryCollator.")
             corpus_format = self.dataset[2]
@@ -92,7 +92,7 @@ class ColModelTraining:
                 image_dataset=neg_dataset,
                 mined_negatives=True,
                 corpus_format=corpus_format,
-                num_negatives=4
+                num_negatives=self.config.num_negatives,
             )
         else:
             print("Dataset has QA format. Using VisualRetrieverCollator.")
