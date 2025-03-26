@@ -45,6 +45,92 @@ def load_train_set_colpali_vdr() -> DatasetDict:
     ds_dict = DatasetDict({"train": dataset, "test": None})
     return ds_dict
 
+def load_train_set_ir_negs_vdr() -> Tuple[DatasetDict, Dataset, str]:
+    ds_paths = [
+        ("nomic-ai/colpali-queries-mined-20250321-by-source", None),
+        ("nomic-ai/vdr-multilingual-train-hn-mine", "it"),
+        ("nomic-ai/vdr-multilingual-train-hn-mine", "en"),
+        ("nomic-ai/vdr-multilingual-train-hn-mine", "fr"),
+        ("nomic-ai/vdr-multilingual-train-hn-mine", "de"),
+        ("nomic-ai/vdr-multilingual-train-hn-mine", "es"),
+    ]
+    ds_tot = {}
+    
+    for (path, subset) in ds_paths:
+        if subset is None:
+            ds = cast(DatasetDict, load_dataset(path, num_proc=4))
+            ds_tot = {**ds_tot, **ds}
+        else:
+            ds = cast(Dataset, load_dataset(path, subset, split="train", num_proc=4))
+            ds_tot[f'{path.split("/")[1]}_{subset}'] = ds
+            
+    dataset = cast(DatasetDict, DatasetDict(ds_tot))
+
+    print("Dataset size:", len(dataset))
+    # filter out queries with "gold_in_top_100" == False
+    # dataset = dataset.filter(lambda x: x["gold_in_top_100"], num_proc=16)
+    # print("Dataset size after filtering:", len(dataset))
+
+    # keep only top 20 negative passages
+    dataset = dataset.map(lambda x: {"negative_passages": x["negative_passages"][:20]})
+
+    # dataset_eval = dataset.select(range(500))
+    # dataset = dataset.select(range(500, len(dataset)))
+    ds_dict = DatasetDict({"train": dataset, "test": None})
+
+    corpus_paths = [
+        ("manu/colpali-corpus", None),
+        ("nomic-ai/vdr-multilingual-train-corpus", "it"),
+        ("nomic-ai/vdr-multilingual-train-corpus", "en"),
+        ("nomic-ai/vdr-multilingual-train-corpus", "fr"),
+        ("nomic-ai/vdr-multilingual-train-corpus", "de"),
+        ("nomic-ai/vdr-multilingual-train-corpus", "es"),
+    ]
+    anchor_ds_list = {}
+    for (path, subset) in corpus_paths:
+        if subset is None:
+            ds = cast(Dataset, load_dataset(path, split="train", num_proc=4))
+            anchor_ds_list[path.split("/")[1]] = ds
+        else:
+            ds = cast(Dataset, load_dataset(path, subset, split="train", num_proc=4))
+            anchor_ds_list[subset] = ds
+
+    anchor_ds = DatasetDict(anchor_ds_list)
+
+    return ds_dict, anchor_ds, "vidore"
+
+def load_train_set_vdr(lang: str = None) -> DatasetDict:
+    if lang is None:
+        ds_paths = [
+            ("llamaindex/vdr-multilingual-train", "it"),
+            ("llamaindex/vdr-multilingual-train", "en"),
+            ("llamaindex/vdr-multilingual-train", "fr"),
+            ("llamaindex/vdr-multilingual-train", "de"),
+            ("llamaindex/vdr-multilingual-train", "es"),
+        ]
+    else:
+        if lang not in ["fr", "es"]:
+            ds_paths = [("llamaindex/vdr-multilingual-train", lang)]
+        else:
+            ds_paths = [("nomic-ai/vdr-multilingual-train", lang)]
+    ds_tot = {}
+    
+    for (path, split) in ds_paths:
+        if split is None:
+            ds = cast(DatasetDict, load_dataset(path, num_proc=4))
+            ds_tot = {**ds_tot, **ds}
+        else:
+            ds = cast(Dataset, load_dataset(path, split, split="train", num_proc=4))
+            ds_tot[f'{path.split("/")[1]}_{split}'] = ds
+            
+    dataset = cast(DatasetDict, DatasetDict(ds_tot))
+
+    dataset = dataset.rename_columns({"id": "image_filename"})
+    dataset = dataset.remove_columns(["negatives"])
+    
+    ds_dict = DatasetDict({"train": dataset, "test": None})
+    return ds_dict
+
 def load_train_set_split_by_source() -> DatasetDict:
     ds_dict = cast(DatasetDict, load_dataset("nomic-ai/colpali_train_set_split_by_source"))
     return {"train": ds_dict, "test": None}
