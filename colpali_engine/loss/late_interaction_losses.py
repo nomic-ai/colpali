@@ -67,6 +67,7 @@ class ColbertPairwiseCELoss(torch.nn.Module):
             rank = dist.get_rank() if dist.is_initialized() else 0
             num_logits = scores.shape[0]
             labels = labels + rank * num_logits
+            labels = labels * (doc_embeddings.shape[0] // (query_embeddings.size(0) * dist.get_world_size()))
             pos_scores = scores[torch.arange(batch_size), labels]
 
             # neg scores are compared against all other pages except pos scores
